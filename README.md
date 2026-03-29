@@ -1,6 +1,6 @@
 # Chess Coaching Graph
 
-A standalone project created for the author of [Chess Masti](https://github.com/AayanHetam/chess-coach-ai) that demonstrates how a Neo4j graph database can connect chess positions, puzzles, and games to power adaptive coaching features. It includes a working data pipeline, instructions for creating a Neo4j instance with sample queries, and a set of improvement recommendations with reference implementations.
+A companion project for [Chess Masti](https://github.com/AayanHetam/chess-coach-ai) that demonstrates how a Neo4j graph database can connect chess positions, puzzles, and games to power adaptive coaching features. It includes a working data pipeline, instructions for creating a Neo4j instance with sample queries, and a set of improvement recommendations with reference implementations.
 
 ## Getting Started
 
