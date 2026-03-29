@@ -332,25 +332,27 @@ LIMIT 10
 
 ### 12. Opening-scoped puzzles
 
-This is the opening-scoped analysis query. It joins all three layers: Opening <- IN_OPENING <- Position <- STARTS_FROM <- Puzzle. The result is every puzzle whose starting position falls within a specific opening's tree — powering queries like "show me tactical exercises for the Italian Game."
+FROM_OPENING links each puzzle to its opening based on the puzzle's opening tags from the Lichess database. Puzzle positions are typically deep in the middlegame — well past the opening skeleton — so this direct relationship is the reliable way to scope puzzles by opening.
 
 ```cypher
-MATCH (o:Opening {eco: 'C50'})<-[:IN_OPENING]-(p:Position)<-[:STARTS_FROM]-(pz:Puzzle)
+MATCH (pz:Puzzle)-[:FROM_OPENING]->(o:Opening {eco: 'C54'})
+MATCH (pz)-[:STARTS_FROM]->(p:Position)
 RETURN pz.puzzleId AS puzzle, pz.rating AS rating,
        left(p.fen, 40) AS position
 ORDER BY pz.rating DESC
 LIMIT 10
 ```
 
-**In plain terms:** Find all puzzles that arise from positions in the Italian Game. This is how a coach would say "practice tactics from the opening you're studying."
+**In plain terms:** Find all puzzles that belong to a specific Italian Game variation (here, the Classical Variation C54). This is how a coach would say "practice tactics from the opening you're studying."
 
-**How it works:** This joins three layers of the graph in a single pattern: Opening ← Position ← Puzzle. It finds puzzles whose starting position falls within a specific opening's theory tree. This is the query that powers "show me tactical exercises for the Italian Game" — it works because Position nodes are shared hubs connecting openings and puzzles.
+**How it works:** FROM_OPENING connects Puzzles directly to Opening nodes using the Lichess opening tags embedded in the puzzle source data. This avoids traversing through Position nodes — which would fail because puzzle starting positions are deep middlegame FENs that don't appear in the opening skeleton (the skeleton only covers ~13-28 plies of theory, while puzzles arise 30-60+ moves into a game).
+
+**Design lesson:** An earlier version of this query tried `Opening <- IN_OPENING <- Position <- STARTS_FROM <- Puzzle`, which returned zero results. The fix was to create FROM_OPENING during data loading using the opening tags already present in the puzzle JSON. This turns an empty result set into hundreds of actionable puzzles per variation.
 
 **Traversal steps:**
-1. Neo4j finds the Opening node where `eco = 'C50'`
-2. From that Opening, it follows incoming IN_OPENING relationships to find all Position nodes in the Italian Game tree
-3. For each of those Positions, it follows incoming STARTS_FROM relationships to find Puzzles that begin at that position
-4. It reads puzzle and position properties, sorts by rating descending, and returns the top 10
+1. Neo4j finds all Puzzle nodes that have a FROM_OPENING edge to the Opening where `eco = 'C54'`
+2. For each Puzzle, it follows the STARTS_FROM edge to get the starting Position
+3. It reads puzzle and position properties, sorts by rating descending, and returns the top 10
 
 ### 13. Games by opening
 
@@ -372,7 +374,31 @@ LIMIT 10
 2. For each matching Game, it reads the `gameId`, `eco`, and `result` properties
 3. Results are sorted by gameId and the first 10 are returned
 
-### 14. Replay a game's position chain
+### 14. Opening as hub — Games and puzzles per variation
+
+FROM_OPENING connects both Games and Puzzles directly to Opening nodes, making Opening a central hub for the entire dataset. This single query fans out to both datasets from the Opening node — something that wasn't possible when games and puzzles only linked to Positions. Without FROM_OPENING, you'd need to join through Position nodes (expensive) or match on property values (losing the graph traversal advantage).
+
+```cypher
+MATCH (o:Opening)
+OPTIONAL MATCH (g:Game)-[:FROM_OPENING]->(o)
+WITH o, count(g) AS games
+OPTIONAL MATCH (pz:Puzzle)-[:FROM_OPENING]->(o)
+RETURN o.eco AS eco, o.name AS opening, games, count(pz) AS puzzles
+ORDER BY o.eco
+```
+
+**In plain terms:** For each opening variation, count the available games and puzzles — a single query that spans all three datasets (openings, games, puzzles) via the Opening hub node.
+
+**How it works:** OPTIONAL MATCH works like a SQL LEFT JOIN — it returns the Opening node even if no Games or Puzzles are connected. The first OPTIONAL MATCH + `count(g)` aggregates games per opening. The WITH clause passes the aggregated result forward. The second OPTIONAL MATCH + `count(pz)` then aggregates puzzles. This two-stage pattern avoids a cartesian product between games and puzzles.
+
+**Traversal steps:**
+1. Neo4j finds all Opening nodes via the label index
+2. For each Opening, it follows incoming FROM_OPENING relationships from Game nodes and counts them
+3. The WITH clause collapses each Opening to a single row with its game count
+4. For each Opening, it follows incoming FROM_OPENING relationships from Puzzle nodes and counts them
+5. Results are sorted by ECO code, showing the full coverage picture across all variations
+
+### 15. Replay a game's position chain
 
 Follow a single game from start to finish. HAS_MOVE points to the first position, then GAME_MOVE (indexed on gameId) walks the full move sequence. The upper bound of 200 covers the longest possible chess game.
 
@@ -396,29 +422,34 @@ RETURN g.gameId AS game, length(path) AS total_moves,
 4. The `WHERE NOT` clause keeps only the path that ends at the final position — where no further GAME_MOVE with this gameId exists
 5. It returns the game ID, total move count, and the FEN of the first and last positions
 
-### 15. Cross-dataset connectivity — positions shared between openings and games
+### 16. Cross-dataset connectivity — Where games diverge from opening theory
 
-The Position-as-hub design means opening skeleton positions are reused by games that pass through them. This query shows which opening positions appear most frequently in actual games.
+The Position-as-hub design means opening skeleton positions are reused by games that pass through them. This query finds divergence points — opening positions where games branch into multiple different continuations.
 
 ```cypher
 MATCH (p:Position)-[:IN_OPENING]->(o:Opening)
-WITH p, o
-MATCH (g:Game)-[:HAS_MOVE|GAME_MOVE*1..10]->(p)
-RETURN o.eco AS eco, left(p.fen, 40) AS position,
-       count(DISTINCT g) AS games_through_position
-ORDER BY games_through_position DESC
+WITH p, collect(DISTINCT o.eco) AS ecos
+MATCH (p)-[gm:GAME_MOVE]->(next:Position)
+WITH ecos, left(p.fen, 40) AS position,
+     count(DISTINCT gm.gameId) AS games, count(DISTINCT next) AS branches
+WHERE branches > 1
+RETURN ecos, position, games, branches
+ORDER BY branches DESC, games DESC
 LIMIT 10
 ```
 
-**In plain terms:** Find which opening book positions show up most often in real games. These are the critical crossroads where theory meets practice — the positions a student should know best.
+**In plain terms:** Find the positions in opening theory where players actually disagree — where games split into multiple different continuations. The `ecos` list shows which openings share each branching position.
 
-**How it works:** This query demonstrates the "Position as hub" design. Position nodes are shared across openings and games — the same node that represents a board state in opening theory is also referenced by games that reach that position. The `HAS_MOVE|GAME_MOVE*1..10` syntax follows either relationship type in a variable-length expansion, finding games that pass through opening positions within 10 moves. `count(DISTINCT g)` ensures each game is counted once even if multiple paths reach the same position.
+**How it works:** First, each Position in the opening tree is paired with all the ECO codes it belongs to (via `collect`). Then, for each position, the query counts how many distinct games pass through it (`games`) and how many different next moves were played (`branches`). Filtering for `branches > 1` keeps only the true decision points.
+
+**Design lesson:** An earlier version sorted by `games_through_position DESC`, but every game passes through the same early moves (e4, e5, Nf3, Nc6, Bc4), so the top rows all showed 440 games — technically correct but uninteresting. Counting distinct next-move targets and filtering for `branches > 1` surfaces the real decision points. The `ecos` list reveals which openings share each branching position, showing the Position-as-hub design in action.
 
 **Traversal steps:**
-1. Neo4j finds all Position nodes that have an IN_OPENING relationship to an Opening (the opening skeleton positions)
-2. For each of those Positions, it looks for Game nodes that can reach it via a chain of HAS_MOVE or GAME_MOVE hops (up to 10 deep)
-3. `count(DISTINCT g)` counts how many unique games pass through each position
-4. Results are sorted by game count descending — the top 10 are the most commonly visited opening positions in actual play
+1. Neo4j finds all Position nodes with IN_OPENING edges and collects their ECO codes into a list
+2. For each Position, it follows all outgoing GAME_MOVE relationships to find what next moves were played
+3. It counts distinct game IDs (how many games passed through) and distinct next Positions (how many different moves were played)
+4. The WHERE clause filters to positions with more than one continuation — the divergence points
+5. Results are sorted by branch count then game count, showing the biggest decision points first
 
 ---
 
