@@ -65,7 +65,7 @@ For now, the startup sync pattern is the right tradeoff: simple to implement, ea
 
 ## 2. Openings: Extract the Openings out of the TypeScript Data File into Structured JSON
 
-> **Status:** The suggested replacement is in `suggested-openings/`.
+> **Status:** The suggested replacement is in [`suggested-openings/`](./suggested-openings/).
 
 #### The challenge
 
@@ -73,9 +73,9 @@ For now, the startup sync pattern is the right tradeoff: simple to implement, ea
 
 #### The suggested alternative
 
-`suggested-openings/` contains two files that together replace the hardcoded TypeScript:
+[`suggested-openings/`](./suggested-openings/) contains two files that together replace the hardcoded TypeScript:
 
-**`openings.json`** — A structured JSON file with 3,401 openings, each carrying four fields:
+**[`openings.json`](./suggested-openings/openings.json)** — A structured JSON file with 3,401 openings, each carrying four fields:
 
 ```json
 { "name": "Sicilian Defense: Najdorf Variation", "fen": "rnbqkb1r/1p2pppp/p2p1n2/8/3NP3/2N5/PPP2PPP/R1BQKB1R", "eco": "B90", "pgn": "1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6" }
@@ -83,7 +83,7 @@ For now, the startup sync pattern is the right tradeoff: simple to implement, ea
 
 ECO codes and PGN move sequences were sourced from the lichess-org/chess-openings dataset. Coverage: 96.4% of entries have ECO codes (3,278 of 3,401) and 94.6% have PGN sequences (3,219 of 3,401). The remaining entries with null values can be enriched over time without code changes.
 
-**`openings-data.ts`** — A Firestore service module that follows the same patterns established in `firestoreGames.ts` (modular SDK imports, shared `firebase.ts` config, `serverTimestamp()`, guard clauses). It provides:
+**[`openings-data.ts`](./suggested-openings/openings-data.ts)** — A Firestore service module that follows the same patterns established in `firestoreGames.ts` (modular SDK imports, shared `firebase.ts` config, `serverTimestamp()`, guard clauses). It provides:
 
 - `bulkLoadOpenings()` — Batch-writes the JSON to Firestore in chunks of 500 (7 batches for 3,401 openings)
 - `getAllOpenings()` / `getOpeningsPaginated()` — Full and paginated reads, ordered by name
@@ -101,7 +101,7 @@ Section 1 covers where to host the static JSON and how to sync it to Firestore.
 
 ## 3. Unify the Three Opening Systems
 
-> **Status:** The suggested replacement is in `suggested-unified-opening-systems/`.
+> **Status:** The suggested replacement is in [`suggested-unified-opening-systems/`](./suggested-unified-opening-systems/).
 
 #### The challenge
 
@@ -113,15 +113,15 @@ The application has three separate representations of openings that serve differ
 
 #### The suggested alternative
 
-`suggested-unified-opening-systems/` contains two files that replace the detector and repertoire modules, both drawing from the unified Firestore openings collection (Section 2):
+[`suggested-unified-opening-systems/`](./suggested-unified-opening-systems/) contains two files that replace the detector and repertoire modules, both drawing from the unified Firestore openings collection (Section 2):
 
-**`unified-opening-detector.ts`** — Replaces the 29-entry hardcoded database with detection powered by all 3,219 openings that have PGN sequences. On first use, it loads the openings from Firestore, parses their PGN strings into move arrays, and builds a trie (prefix tree) for efficient matching. The trie is cached in module scope for subsequent calls.
+**[`unified-opening-detector.ts`](./suggested-unified-opening-systems/unified-opening-detector.ts)** — Replaces the 29-entry hardcoded database with detection powered by all 3,219 openings that have PGN sequences. On first use, it loads the openings from Firestore, parses their PGN strings into move arrays, and builds a trie (prefix tree) for efficient matching. The trie is cached in module scope for subsequent calls.
 
 Detection uses a longest-match-wins strategy: if a game starts with 1. e4 c5 2. Nf3 d6 3. d4 cxd4 4. Nxd4 Nf6 5. Nc3 a6, the detector returns "Sicilian Defense: Najdorf Variation" (B90) rather than the less specific "Sicilian Defense" (B20) that matches at move 2. The original detector would return just "Sicilian Defense" for any Sicilian game because it has no sub-variation entries.
 
 The module exports the same three functions and `OpeningInfo` interface as the original `openingDetector.ts`, so callers do not need to change. The only API difference is that `detectOpening()` is now async (it returns `Promise<OpeningInfo | null>`) because the first call loads data from Firestore. The `isOpeningMove()` and `getOpeningPhase()` functions remain synchronous and unchanged.
 
-**`unified-repertoires.ts`** — Keeps all 11 curated drill repertoires and their hand-picked lines unchanged (these are pedagogical content, not generated from the openings dataset). Adds two functions that connect repertoires to the unified data:
+**[`unified-repertoires.ts`](./suggested-unified-opening-systems/unified-repertoires.ts)** — Keeps all 11 curated drill repertoires and their hand-picked lines unchanged (these are pedagogical content, not generated from the openings dataset). Adds two functions that connect repertoires to the unified data:
 
 - `lookupRepertoireOpening(repertoire)` — Looks up the parent opening in Firestore by name or ECO code, returning the full `OpeningDocument` with FEN, ECO, and PGN. This lets the UI show the starting position for any repertoire and validate that its ECO code matches the authoritative data.
 - `enrichRepertoire(repertoire)` — Returns a new repertoire with metadata updated from the unified collection (ECO code, name). Drill lines are preserved unchanged.
@@ -132,7 +132,7 @@ The existing exports (`OPENING_REPERTOIRES`, `getRepertoiresByColor`, `getRepert
 
 ## 4. Introduce Structured Logging
 
-> **Status:** A working sample is in `sample-logging/`.
+> **Status:** A working sample is in [`sample-logging/`](./sample-logging/).
 
 #### The challenge
 
@@ -147,18 +147,18 @@ This creates several concrete problems:
 
 #### The suggested alternative
 
-`sample-logging/` contains three modules and two before/after examples that demonstrate how a lightweight structured logger could replace the current patterns:
+[`sample-logging/`](./sample-logging/) contains three modules and two before/after examples that demonstrate how a lightweight structured logger could replace the current patterns:
 
-**`request-context.ts`** — Uses Node.js `AsyncLocalStorage` to flow a request ID through the entire call chain without parameter threading. The ID comes from Vercel's `x-vercel-id` header (or `crypto.randomUUID()` in local dev). Every downstream module can call `getRequestId()` without the request ID being passed as a function argument.
+**[`request-context.ts`](./sample-logging/request-context.ts)** — Uses Node.js `AsyncLocalStorage` to flow a request ID through the entire call chain without parameter threading. The ID comes from Vercel's `x-vercel-id` header (or `crypto.randomUUID()` in local dev). Every downstream module can call `getRequestId()` without the request ID being passed as a function argument.
 
-**`logger.ts`** — A zero-dependency structured logger with four levels (`debug`, `info`, `warn`, `error`), `LOG_LEVEL` environment variable filtering, and environment-aware output: minified JSON lines in production (what Vercel Log Drain expects), colored human-readable lines in development. Child loggers (`logger.child({ module: "cache" })`) replace the emoji prefix convention with machine-parseable namespace fields.
+**[`logger.ts`](./sample-logging/logger.ts)** — A zero-dependency structured logger with four levels (`debug`, `info`, `warn`, `error`), `LOG_LEVEL` environment variable filtering, and environment-aware output: minified JSON lines in production (what Vercel Log Drain expects), colored human-readable lines in development. Child loggers (`logger.child({ module: "cache" })`) replace the emoji prefix convention with machine-parseable namespace fields.
 
-**`sentry-integration.ts`** — A drop-in replacement for the existing `src/lib/sentry.ts` that preserves the same `logErrorToSentry()` API. Adds a Sentry breadcrumb bridge: `info` and `warn` log entries become Sentry breadcrumbs automatically, so when an error fires, the Sentry error detail page shows the structured trail of events leading up to it.
+**[`sentry-integration.ts`](./sample-logging/sentry-integration.ts)** — A drop-in replacement for the existing `src/lib/sentry.ts` that preserves the same `logErrorToSentry()` API. Adds a Sentry breadcrumb bridge: `info` and `warn` log entries become Sentry breadcrumbs automatically, so when an error fires, the Sentry error detail page shows the structured trail of events leading up to it.
 
 The `examples/` directory shows the transformation applied to real code:
 
-- **`feedback-route.ts`** — The `/api/feedback` route goes from 6 separate `console.*` calls to 4 structured calls with context objects, wrapped in `withRequestContext` for automatic request ID tagging.
-- **`response-cache.ts`** — The cache module goes from 4 emoji-prefixed `console.log` calls to 6 level-appropriate structured calls. Cache skips and TTL expirations become `debug` (suppressed in production), cache clears become `warn` (always visible), and every entry carries searchable fields like `cacheKey`, `hitCount`, and `validationScore`.
+- **[`feedback-route.ts`](./sample-logging/examples/feedback-route.ts)** — The `/api/feedback` route goes from 6 separate `console.*` calls to 4 structured calls with context objects, wrapped in `withRequestContext` for automatic request ID tagging.
+- **[`response-cache.ts`](./sample-logging/examples/response-cache.ts)** — The cache module goes from 4 emoji-prefixed `console.log` calls to 6 level-appropriate structured calls. Cache skips and TTL expirations become `debug` (suppressed in production), cache clears become `warn` (always visible), and every entry carries searchable fields like `cacheKey`, `hitCount`, and `validationScore`.
 
 The result is production logs that look like this:
 
@@ -172,7 +172,7 @@ Every field is searchable in Vercel's log viewer, forwardable to a Log Drain (Da
 
 ## 5. Validate API Inputs at the Boundary
 
-> **Status:** A working sample is in `sample-validation/`.
+> **Status:** A working sample is in [`sample-validation/`](./sample-validation/).
 
 #### The challenge
 
@@ -190,9 +190,9 @@ When invalid inputs are not caught at the route boundary, errors surface deep in
 
 #### The suggested alternative
 
-`sample-validation/` contains a Zod schema module and two before/after route examples:
+[`sample-validation/`](./sample-validation/) contains a Zod schema module and two before/after route examples:
 
-**`schemas.ts`** — Defines schemas for 6 API routes plus shared field validators (`fenSchema`, `usernameSchema`, `platformSchema`, `difficultyBandSchema`). Each schema validates types, constrains ranges, and provides defaults:
+**[`schemas.ts`](./sample-validation/schemas.ts)** — Defines schemas for 6 API routes plus shared field validators (`fenSchema`, `usernameSchema`, `platformSchema`, `difficultyBandSchema`). Each schema validates types, constrains ranges, and provides defaults:
 
 ```typescript
 export const puzzleDatasetSchema = z.object({
@@ -226,7 +226,7 @@ Zod is the dominant validation library in the Next.js ecosystem (integrates with
 
 ## 6. Add React Error Boundaries
 
-> **Status:** A working sample is in `sample-error-boundaries/`.
+> **Status:** A working sample is in [`sample-error-boundaries/`](./sample-error-boundaries/).
 
 #### The challenge
 
@@ -242,15 +242,15 @@ The component hierarchy from `_app.tsx` is `QueryClientProvider → AuthProvider
 
 #### The suggested alternative
 
-`sample-error-boundaries/` contains a reusable `ErrorBoundary` class component and three before/after examples showing where to place boundaries in the component tree:
+[`sample-error-boundaries/`](./sample-error-boundaries/) contains a reusable `ErrorBoundary` class component and three before/after examples showing where to place boundaries in the component tree:
 
-**`ErrorBoundary.tsx`** — A single configurable component with a `name` prop for identification, support for custom or default fallback UI, a `reset()` function for retry without page reload, and Sentry integration that tags each captured error with the boundary name for dashboard filtering.
+**[`ErrorBoundary.tsx`](./sample-error-boundaries/ErrorBoundary.tsx)** — A single configurable component with a `name` prop for identification, support for custom or default fallback UI, a `reset()` function for retry without page reload, and Sentry integration that tags each captured error with the boundary name for dashboard filtering.
 
-**`examples/analysis-page.tsx`** — The analysis page with four boundaries: one around the chessboard, one around each of the three tab panels (analysis, moves/coach, AI coach). If the AI coach crashes (the highest-risk section, with 13 Chess instantiations and JSON.parse calls), the chessboard and analysis panel keep working. The tab navigation and toolbar stay outside boundaries so users can always switch tabs.
+**[`examples/analysis-page.tsx`](./sample-error-boundaries/examples/analysis-page.tsx)** — The analysis page with four boundaries: one around the chessboard, one around each of the three tab panels (analysis, moves/coach, AI coach). If the AI coach crashes (the highest-risk section, with 13 Chess instantiations and JSON.parse calls), the chessboard and analysis panel keep working. The tab navigation and toolbar stay outside boundaries so users can always switch tabs.
 
-**`examples/practice-page.tsx`** — The practice page with three boundaries: PuzzleRush (810 lines, timer-driven state transitions), PatternTraining, and PracticeBoard. The Back button and theme selector stay outside boundaries so users can always navigate away from a broken puzzle.
+**[`examples/practice-page.tsx`](./sample-error-boundaries/examples/practice-page.tsx)** — The practice page with three boundaries: PuzzleRush (810 lines, timer-driven state transitions), PatternTraining, and PracticeBoard. The Back button and theme selector stay outside boundaries so users can always navigate away from a broken puzzle.
 
-**`examples/app-wrapper.tsx`** — A top-level boundary in `_app.tsx` as a last-resort safety net. Placed inside `QueryClientProvider` and `AuthProvider` so the user stays authenticated after clicking "Try Again". This catches any error that escapes section-level boundaries or occurs in pages that haven't been wrapped yet.
+**[`examples/app-wrapper.tsx`](./sample-error-boundaries/examples/app-wrapper.tsx)** — A top-level boundary in `_app.tsx` as a last-resort safety net. Placed inside `QueryClientProvider` and `AuthProvider` so the user stays authenticated after clicking "Try Again". This catches any error that escapes section-level boundaries or occurs in pages that haven't been wrapped yet.
 
 The boundary placement hierarchy:
 
