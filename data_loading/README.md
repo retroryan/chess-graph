@@ -26,7 +26,7 @@ After loading, run the Cypher tutorial to explore the graph:
 uv run sample-queries
 ```
 
-This walks through 15 queries covering the graph schema, MATCH basics, traversals, aggregations, variable-length paths, the adaptive puzzle recommendation query, opening-scoped puzzle analysis, and Lichess game data.
+This walks through 16 queries covering the graph schema, MATCH basics, traversals, aggregations, variable-length paths, the adaptive puzzle recommendation query, opening-scoped puzzle analysis, and Lichess game data.
 
 ## What Gets Loaded
 

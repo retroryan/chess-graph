@@ -260,14 +260,34 @@ ORDER BY games DESC
     )
 
 
-def section_14_replay_game():
+def section_14_opening_hub():
+    run(
+        "14. Opening as hub — Games and puzzles per variation",
+        """FROM_OPENING connects both Games and Puzzles directly to Opening nodes,
+making Opening a central hub for the entire dataset. This single query fans
+out to both datasets from the Opening node — something that wasn't possible
+when games and puzzles only linked to Positions. Without FROM_OPENING, you'd
+need to join through Position nodes (expensive) or match on property values
+(losing the graph traversal advantage).""",
+        """
+MATCH (o:Opening)
+OPTIONAL MATCH (g:Game)-[:FROM_OPENING]->(o)
+WITH o, count(g) AS games
+OPTIONAL MATCH (pz:Puzzle)-[:FROM_OPENING]->(o)
+RETURN o.eco AS eco, o.name AS opening, games, count(pz) AS puzzles
+ORDER BY o.eco
+""",
+    )
+
+
+def section_15_replay_game():
     # Performance note: This variable-length path with property filter could be
     # rewritten as a Quantified Path Pattern (QPP) for better performance in
     # production. QPP allows inline filtering during traversal rather than
     # post-expansion filtering. The legacy *1..200 syntax is used here for
     # tutorial clarity.
     run(
-        "14. Replay a game — Follow a game's position chain",
+        "15. Replay a game — Follow a game's position chain",
         """HAS_MOVE points from a Game to its starting position. GAME_MOVE edges
 (indexed on gameId) walk the full move sequence. The upper bound of 200
 covers the longest possible chess game (~180 half-moves).""",
@@ -282,9 +302,9 @@ RETURN g.gameId AS game, length(path) AS total_moves,
     )
 
 
-def section_15_cross_dataset():
+def section_16_cross_dataset():
     run(
-        "15. Cross-dataset connectivity — Where games diverge from opening theory",
+        "16. Cross-dataset connectivity — Where games diverge from opening theory",
         """The Position-as-hub design means opening skeleton positions are reused by
 games that pass through them. This query finds divergence points — opening
 positions where games branch into multiple different continuations. The
@@ -328,8 +348,9 @@ def main():
     section_11_variable_length()
     section_12_opening_scoped_puzzles()
     section_13_games_by_opening()
-    section_14_replay_game()
-    section_15_cross_dataset()
+    section_14_opening_hub()
+    section_15_replay_game()
+    section_16_cross_dataset()
 
     print(SEPARATOR)
     print("Tutorial complete.")
