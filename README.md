@@ -2,6 +2,16 @@
 
 A companion project for [Chess Masti](https://github.com/AayanHetam/chess-coach-ai) that demonstrates how a Neo4j graph database can connect chess positions, puzzles, and games to power adaptive coaching features. It includes a working data pipeline, instructions for creating a Neo4j instance with sample queries, and a set of improvement recommendations with reference implementations.
 
+## Graph Model
+
+![Chess Coach AI — Graph Model](simplified-chess-graph.png)
+
+> This diagram was created with [Excalidraw](https://excalidraw.com/) ([source file](simplified-chess-graph.excalidraw)). AI models work well with Excalidraw's JSON format, making it a good choice for iterating on data model diagrams through conversation.
+
+Six node types and nine relationships, with Position at the center as a shared hub. Games replay through positions move by move, puzzles start from specific board states, and openings catalog theoretical move sequences. Because every dataset connects through shared Position nodes, a single Cypher query can traverse from a user's weaknesses to recommended puzzles without joining across tables: User -> STRUGGLED_WITH -> Theme <- HAS_THEME <- Puzzle.
+
+The full graph contains approximately 28,000 nodes and 37,000 relationships, well within the Neo4j Aura free tier. See [ARCHITECTURE.md](ARCHITECTURE.md) for a complete walkthrough of each node type, each relationship, and the design decisions behind the model.
+
 ## Getting Started
 
 ### Setup
