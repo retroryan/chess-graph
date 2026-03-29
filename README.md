@@ -39,6 +39,10 @@ The data loader creates a graph of openings, puzzles, games, and seed users in a
 
 The README also includes 15 sample Cypher queries with tutorials explaining how each query works and the steps it takes to traverse the graph. These progress from basic schema inspection to the full adaptive puzzle recommendation query, and can be pasted directly into the Aura console.
 
+### Integration into Chess Masti
+
+See [vercel_api.md](vercel_api.md) for a step-by-step guide to connecting Chess Masti to the Neo4j graph. Chess Masti runs on Vercel as a Next.js application and already has App Router API routes (`src/app/api/`) that run as serverless functions. The guide covers why Neo4j credentials cannot be exposed to the browser (unlike Firebase, Neo4j has no client-side security rules), how to add read-only Neo4j route handlers that follow the project's existing patterns, and how to keep all graph writes in the Python data pipeline for data consistency.
+
 ## Part 2: Recommendations
 
 [RECOMMENDATIONS.md](RECOMMENDATIONS.md) contains improvement suggestions for Chess Masti, starting with what the project already gets right and then covering 11 areas for improvement. Five of the recommendations include working reference implementations in the `chess-graph/` directory:
